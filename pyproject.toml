@@ -1,0 +1,164 @@
+# Declared so that `pip install ".[test]"` is the one install step the README gives for the
+# tests. With no backend named, pip falls back to an implicit setuptools it fetches unasked.
+[build-system]
+# 77 is the first setuptools to accept the SPDX `license` string in [project] (PEP 639).
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "os-schedule-gen"
+version = "0.1.0"
+description = "A multi-OS scheduler file generator: write a schedule once and run it on Windows, Linux and macOS."
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+# The oldest interpreter the suites are run on and the code is type-checked for. The ruff
+# and mypy targets below follow it: a newer target would pass syntax and standard-library
+# names that are an error here.
+requires-python = ">=3.12"
+# Deliberately empty: the library, its command line and both vendored libraries use the
+# standard library alone.
+dependencies = []
+
+[project.optional-dependencies]
+# The property tests in stdio_utf8/tests/. Tests only: nothing at runtime imports it.
+test = ["hypothesis==6.165.10"]
+
+[tool.setuptools]
+# Deliberately empty. The tool is run directly and puts src/ and its two library folders on
+# sys.path itself, so nothing here is imported from an installed location: installing this
+# distribution installs its metadata and test dependencies, never code. Left to
+# auto-discovery, setuptools refuses this flat layout of sibling folders outright.
+packages = []
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.format]
+# The Python blocks inside the Markdown docs are laid out by hand, and ruff's formatter
+# would reflow them; every .py file is still held to the formatter.
+exclude = ["*.md"]
+
+[tool.ruff.lint]
+# E4/E7/E9/F are ruff's classic default set, written out so the enabled rules are a
+# function of this file rather than of whichever ruff release is installed. PGH003 and
+# PGH004 flag a bare `# type: ignore` or `# noqa`, one that names no rule code. D adds the
+# docstring rules (pep257), minus D401's imperative-mood opinion, which flags valid
+# noun-phrase summaries.
+select = ["E4", "E7", "E9", "F", "PGH003", "PGH004", "D"]
+ignore = ["D401"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.per-file-ignores]
+# Test method names say what each test does; a docstring per test would be noise.
+"**/test_*.py" = ["D"]
+
+[tool.mypy]
+python_version = "3.12"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+# The tool, its src/ modules and its tests reach each other and the two library folders
+# through sys.path inserts at run time; mypy cannot see a runtime insert, so these entries
+# are what make those imports resolve.
+mypy_path = [
+  "$MYPY_CONFIG_FILE_DIR",
+  "$MYPY_CONFIG_FILE_DIR/src",
+  "$MYPY_CONFIG_FILE_DIR/tests",
+  "$MYPY_CONFIG_FILE_DIR/stdio_utf8",
+  "$MYPY_CONFIG_FILE_DIR/help_formatter",
+]
+
+[tool.coverage.run]
+# Branch coverage, not line coverage: a line can run while one side of its condition
+# never does.
+branch = true
+
+[tool.coverage.report]
+# `# pragma: only-on posix` marks a line only a POSIX host runs, and
+# `# pragma: only-on win32` one only Windows runs. Each is excluded on the other kind of
+# host alone, so both stay measured where they run. coverage.py's configuration can read
+# environment variables but not the platform, so it keys on OS: Windows sets it to
+# Windows_NT in every process and POSIX systems leave it unset. exclude_also adds to
+# coverage.py's default patterns, so `# pragma: no cover` keeps working.
+exclude_also = [
+  'pragma:\s*only-on\s+posix\b(?!${OS-})',
+  'pragma:\s*only-on\s+win32\b${OS-}',
+]
+
+# The tables below configure the gates run over this tree before it is published. They are
+# inert for anyone who only runs the tool or its tests. The same gates read the few waivers
+# in the source, comments of the form `# reliability: ignore[...]`, each stating its reason
+# on the line.
+
+[tool.pii_scan]
+# The license names its copyright holder, which is its purpose.
+exclude = ["LICENSE"]
+
+[tool.samples_presence]
+# Libraries with no CLI: nothing in them runs by hand against a sample input. The tool
+# itself ships samples/.
+exempt = ["stdio_utf8", "help_formatter"]
+
+[tool.stdio_policy]
+# The whole tree, the vendored libraries included: a library is exactly where a stray
+# print() does not belong.
+paths = ["."]
+
+[tool.dep_audit]
+# Pinning checks only in the inner loop; the network audit is run on demand.
+offline = "skip"
+
+# prose: ignore[cli_doc_consistency] the table this gate reads, named for it
+[tool.cli_doc_consistency]
+# README.md is the user guide and holds the option table; --help is the option reference,
+# and no companion doc beside os_schedule_gen.py ships.
+exclude = ["os_schedule_gen.py"]
+
+[tool.context_budget]
+# Budgets the instruction files a coding assistant loads at the start of a session. This
+# repository carries none, so the table declares no subjects: the check then has a
+# declaration to read, and measures nothing.
+
+[tool.prose_terms]
+# Words this repository's prose must not use, so they cannot creep back in. They name a
+# standards file, a notes folder and tools from the larger repository this was developed
+# in, none of which ship here, so a sentence that leans on one explains nothing to its
+# reader: state the rule itself, with a reason anyone can check. Each entry waives itself:
+# the declaration is not prose.
+terms = [
+  # prose: ignore[technical_notes] the declaration itself
+  "technical_notes",
+  # prose: ignore[monorepo] the declaration itself
+  "monorepo",
+  # prose: ignore[gate_tree] the declaration itself
+  "gate_tree",
+  # prose: ignore[gate_tree_sweep] the declaration itself
+  "gate_tree_sweep",
+  # prose: ignore[launchd_probe] the declaration itself
+  "launchd_probe",
+  # prose: ignore[py_version_floor] the declaration itself
+  "py_version_floor",
+  # prose: ignore[tool_subdirs] the declaration itself
+  "tool_subdirs",
+  # prose: ignore[python_gate] the declaration itself
+  "python_gate",
+  # prose: ignore[fuzz_gate] the declaration itself
+  "fuzz_gate",
+  # prose: ignore[check_all] the declaration itself
+  "check_all",
+  # prose: ignore[cli_doc_consistency] the declaration itself
+  "cli_doc_consistency",
+  # prose: ignore[install_prereqs] the declaration itself
+  "install_prereqs",
+]
+exclude = ["LICENSE"]
+
+[tool.prose_terms.patterns]
+# Shapes no single word can express, each a pointer that resolves for no reader of this
+# repository: a standards file by its file name (a bare word would also ban the plural
+# "agents", which a tool writing launchd agents needs), a numbered rule section of it, and a
+# path into a notes folder.
+agents-file = '(?<![0-9A-Za-z_])AGENTS\.md'  # prose: ignore[agents-file] the declaration itself
+section-ref = '(?<![0-9A-Za-z_])section\s+[0-9]+(?![0-9A-Za-z_])'  # prose: ignore[section-ref] the declaration itself
+docs-path = '(?<![0-9A-Za-z_./])docs/'  # prose: ignore[docs-path] the declaration itself

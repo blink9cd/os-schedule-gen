@@ -1,0 +1,6 @@
+# Every text file is stored and checked out with LF line endings, whatever core.autocrlf
+# says on the machine that clones this repository. The tool writes LF, and the committed
+# samples are compared with its output byte for byte, so a checkout that turned them into
+# CRLF would fail that comparison on a tree nobody had changed. The Task XML samples are
+# UTF-16, which git reads as binary and leaves alone.
+* text=auto eol=lf

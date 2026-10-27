@@ -1,0 +1,15 @@
+{
+  // markdownlint-cli2's configuration for this repository's Markdown.
+  "config": {
+    "default": true,
+    // MD013 (line length) is the one rule relaxed from the default. The docs hold wide
+    // option tables and long command lines; a fixed column width is not a defect in prose,
+    // and hard-wrapping a command block would break copying it.
+    "MD013": false,
+    // MD024 (no duplicate heading) limited to siblings: parallel sections may share a
+    // subsection name, while a real duplicate within one section is still caught.
+    "MD024": { "siblings_only": true }
+  },
+  "globs": ["**/*.md"],
+  "ignores": ["**/node_modules/**", ".venv/**"]
+}

@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+# `pip install ".[test]"` builds in place, leaving these beside the sources.
+build/
+*.egg-info/
