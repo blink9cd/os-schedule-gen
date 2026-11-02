@@ -1,19 +1,42 @@
 # os-schedule-gen
 
-A multi-OS scheduler file generator: write a schedule once and run it on Windows, Linux and
+A multi-OS scheduler file generator: write a schedule once and run it on Windows, Linux, and
 macOS. It generates correct, safely escaped scheduler files for Windows Task Scheduler, systemd
-timers, launchd plists and crontab lines from one weekly or daily schedule.
+timers, launchd plists, and crontab lines from one weekly or daily schedule.
 
 It is a command line and a library. The command line renders one schedule into files in a
 directory you name; the library hands the same artifacts back as strings and bytes. Neither
 installs anything: registering each file with its scheduler is a step you take yourself, so
-every platform's files can be generated, read and tested on any one machine.
+every platform's files can be generated, read, and tested on any one machine.
 
-## Requirements
+## Install
 
-- Python 3.12 or later (`py -3.12` on Windows); the commands below call it `python`.
-- No dependencies: the tool, the library and the two small libraries vendored beside them use
-  the standard library alone. The tests need Hypothesis (see *Running the tests*).
+Needs Python 3.12 or newer. Install into a virtual
+environment, because Homebrew and Debian Python refuse a
+system-wide `pip install`:
+
+```bash
+python3 -m venv .venv
+# shellcheck source=/dev/null # the activate script exists only once the line above has run
+source .venv/bin/activate
+pip install '.[test]'
+```
+
+The commands below assume the venv is active, so `python`
+is the venv's interpreter.
+
+On Windows, create and activate the venv this way instead, in `cmd.exe`. In PowerShell the
+second line is `.venv\Scripts\Activate.ps1`, which runs only where scripts are allowed; for
+the current window, `Set-ExecutionPolicy -Scope Process RemoteSigned` allows it:
+
+```text
+py -3 -m venv .venv
+.venv\Scripts\activate
+pip install ".[test]"
+```
+
+The tool, the library, and the two small libraries vendored beside them use the standard
+library alone. The install adds only Hypothesis, which the tests need.
 
 ## Quick start
 
@@ -46,7 +69,7 @@ that sets every optional field, and a daily one that sets only the required ones
 ## The four outputs, and installing them
 
 Each file is named from `--name`, which is also the job's identity inside every scheduler: the
-systemd unit basename, the launchd `Label` and the task path `\<name>`. Installing is up to you;
+systemd unit basename, the launchd `Label`, and the task path `\<name>`. Installing is up to you;
 these are the usual steps for each.
 
 | File | Scheduler | Where it goes |
@@ -82,16 +105,55 @@ A user timer fires only while your user's service manager runs; `loginctl enable
 running when you are not logged in.
 
 **launchd.** A user agent, not a system daemon, so it needs no elevation; it fires only while
-you have a session. `RunAtLoad` is false, so loading the agent does not start the job. When
-`--log-dir` is given, create that directory before the job first runs:
+you have a session. `RunAtLoad` is false, so loading the agent does not start the job:
 
 ```bash
 cp out/nightly-report.plist ~/Library/LaunchAgents/
 launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/nightly-report.plist
 ```
 
+When the plist was generated with `--log-dir`, create that directory before the job first runs.
+The tool does not create it, because the plist is often generated on another machine than the
+one it runs on. For the same reason, a `$HOME` in `--log-dir` is expanded by the shell on the
+generating machine, so a plist meant for another Mac needs that Mac's absolute path spelled out.
+Generated on the Mac that runs the job with `--log-dir "$HOME/Library/Logs/nightly-report"`,
+for example, the directory is created with:
+
+```bash
+mkdir -p "$HOME/Library/Logs/nightly-report"
+```
+
 **cron.** The file holds one line. Open your crontab with `crontab -e` and paste it in. See
 *Why cron is emit-only* for why nothing writes the crontab for you.
+
+## Removing a job
+
+Each scheduler keeps the job under its `--name`. To remove `nightly-report`:
+
+**Task Scheduler**, from an elevated prompt:
+
+```text
+schtasks /Delete /TN "\nightly-report" /F
+```
+
+**systemd.** Stop and disable the timer, delete both unit files from the directory they were
+copied into, then reload:
+
+```bash
+systemctl --user disable --now nightly-report.timer
+rm ~/.config/systemd/user/nightly-report.service ~/.config/systemd/user/nightly-report.timer
+systemctl --user daemon-reload
+```
+
+**launchd.** Unload the agent by its label, then delete the plist. A `--log-dir` directory, if
+you created one, is yours to delete as well:
+
+```bash
+launchctl bootout "gui/$(id -u)/nightly-report"
+rm ~/Library/LaunchAgents/nightly-report.plist
+```
+
+**cron.** Open your crontab with `crontab -e` and delete the line you pasted.
 
 ## Command line
 
@@ -106,17 +168,17 @@ python os_schedule_gen.py --name NAME --time HH:MM --program PATH --output-dir D
 
 | Option | Required | Default | Meaning |
 | --- | --- | --- | --- |
-| `--name` | yes | — | `[A-Za-z0-9][A-Za-z0-9._-]*` only: a leading `-` or `.`, and `.` and `..`, are refused. The systemd unit basename, the launchd `Label`, the task `\<name>`, and every file name. |
-| `--time HH:MM` | yes | — | The 24-hour time it fires. |
+| `--name` | yes | n/a | `[A-Za-z0-9][A-Za-z0-9._-]*` only: a leading `-` or `.`, and `.` and `..`, are refused. The systemd unit basename, the launchd `Label`, the task `\<name>`, and every file name. |
+| `--time HH:MM` | yes | n/a | The 24-hour time it fires. |
 | `--day DAY` | no | none: every day | `Monday` to `Sunday`. Given, the schedule is weekly; omitted, daily. |
-| `--program PATH` | yes | — | The executable. |
+| `--program PATH` | yes | n/a | The executable. |
 | `--arg WORD` | no | none | One argument word, repeatable, in order. Write a word starting with `-` as `--arg=--mode`. |
-| `--output-dir DIR` | yes | — | Must already exist. |
-| `--target` | no | all four | `task-xml`, `systemd`, `launchd` or `cron`; repeatable. |
+| `--output-dir DIR` | yes | n/a | Must already exist. |
+| `--target` | no | all four | `task-xml`, `systemd`, `launchd`, or `cron`; repeatable. |
 | `--force` | no | off | Overwrite files that already exist. |
 | `--description` | no | `Scheduled job <name>` | systemd `Description=` and the task's `Description`. |
 | `--working-directory DIR` | no | none | The working directory in every artifact (cron enters it with `cd`); omitted, none is written and each scheduler uses its own default. Must be absolute, in the POSIX or the Windows sense, for every target; systemd and cron need a POSIX one. |
-| `--path-env PATH` | no | none: inherit | The job's `PATH` under systemd, launchd and cron. |
+| `--path-env PATH` | no | none: inherit | The job's `PATH` under systemd, launchd, and cron. |
 | `--log-dir DIR` | no | none | An absolute directory for launchd's `StandardOutPath` and `StandardErrorPath`, `<DIR>/<name>.out.log` and `.err.log`; omitted, both keys are left out and launchd discards the output. |
 | `--time-limit-minutes` | no | 120 | A whole number from 1 to 525600 (one year): the task's `ExecutionTimeLimit`, written `PT<n>M` as given, and systemd's `TimeoutStartSec`, in seconds. |
 | `--logon-type` | no | `S4U` | `S4U` or `InteractiveToken`; Task XML only. |
@@ -177,7 +239,7 @@ service, timer = osg.build_systemd_units(
 command word, and the working directory defaults to its folder. A *path_value* of `""` leaves the
 job's `PATH` inherited. Every keyword has a default, and the defaults describe one example job,
 a weekly maintenance run: the task `\Maintenance\WeeklySweep`, the unit `weekly-sweep`, the
-launchd label `local.weekly-sweep`, the arguments `--mode run` and a two-hour time limit. A caller
+launchd label `local.weekly-sweep`, the arguments `--mode run`, and a two-hour time limit. A caller
 scheduling anything else passes its own.
 
 `render_task_xml` holds one `Settings` block for every task: it skips a run that would overlap
@@ -210,11 +272,13 @@ A path is data, and each scheduler must read it back as exactly that path.
 - **Schedules.** A weekday outside `DAYS`, an hour outside 0 to 23, a minute outside 0 to 59,
   or a `bool` hour or minute raises `ValueError`. The Task XML uses the weekday as an element
   *name*, which no XML escape covers.
-- **Line breaks.** A value holding a newline, a carriage return or a NUL raises `ValueError` in
-  the systemd, cron and Task Scheduler builders: no escape keeps one inside a unit-file value or
+- **Line breaks.** A value holding a newline, a carriage return, or a NUL raises `ValueError` in
+  the systemd, cron, and Task Scheduler builders: no escape keeps one inside a unit-file value or
   a crontab line, and it could start a key, or a job, of its own.
 - **Task XML controls.** Any C0 control character other than tab, or DEL, raises `ValueError`
-  naming the keyword: XML 1.0 cannot carry the C0 controls at all.
+  naming the keyword: XML 1.0 cannot carry the C0 controls at all. `build_task_xml` also
+  holds its `task_name` to a task path: a leading `\`, then `\`-separated segments in the
+  set a unit name is held to, so a `..` segment, an empty one, or markup is refused.
 - **systemd.** Each `ExecStart=` word is double-quoted, with `\` and `"` backslash-escaped, `%`
   doubled (a specifier) and `$` doubled (a variable). `Environment=` is quoted the same way but
   for `$`, which has no meaning there. `WorkingDirectory=` takes the rest of its line unquoted,
@@ -223,22 +287,25 @@ A path is data, and each scheduler must read it back as exactly that path.
   leading `-` as "ignore if missing", joins a line ending in `\` to the next, and strips a
   value's surrounding whitespace. `Description=` follows the same unquoted rules. A unit name
   outside `[A-Za-z0-9._-]`, or not starting with a letter or digit, raises `ValueError`.
-- **cron.** Each value is one double-quoted `sh` word, with `$`, a backtick, `"` and `\`
+- **launchd.** The label is held to the same set as a unit name, in `build_launchd_plist` and
+  `launchd_plist_path` alike: it names the plist file, and a `/` or `..` in it would put that
+  file outside `LaunchAgents`.
+- **cron.** Each value is one double-quoted `sh` word, with `$`, a backtick, `"`, and `\`
   backslash-escaped, then a backslash before each `%`, which crontab(5) otherwise reads as a
   newline. Not `shlex.quote`: cron keeps a backslash before anything but `%`, so a `\%` inside
   single quotes could not survive it. The captured `PATH` is an inline `PATH=... command` prefix,
   never a standalone `PATH=` line, which would change every job below it.
-- **Arguments** are written bare only when they are a non-empty run of ASCII letters, digits and
+- **Arguments** are written bare only when they are a non-empty run of ASCII letters, digits, and
   `_ . / : = + , @ -`, which no format reads specially. Any other argument takes its format's
   quoting: systemd's and cron's above, and in the Task XML the Windows command-line form
   (`CommandLineToArgvW`): double-quoted, with a run of backslashes doubled before a `"` and at the
   end.
 - **Batch files.** A `.bat` or `.cmd` program is not run by `CommandLineToArgvW`: `cmd.exe`
-  parses its command line and treats `=`, `,` and `;` as delimiters, so `--level=3` arrives as
+  parses its command line and treats `=`, `,`, and `;` as delimiters, so `--level=3` arrives as
   two words. The guarantee that each argument arrives as exactly the word given covers programs
   that split their command line the Microsoft C runtime's way, not batch files.
 - **`%NAME%` in Task Scheduler.** Task Scheduler expands environment references in a task's
-  command, arguments and working directory, and no escape for that exists. A value holding one
+  command, arguments, and working directory, and no escape for that exists. A value holding one
   reaches the task as written, and the scheduler may expand it.
 
 The tests check the meaning, not the text. They read each systemd unit back as INI after joining
@@ -258,18 +325,17 @@ to paste.
 
 ## Running the tests
 
-From the repository root, in a Python 3.12 virtual environment, which the first line creates
-in `.venv/`:
+From the repository root, with the venv from *Install* active:
 
 ```bash
-python -m venv .venv
-.venv/bin/python -m pip install ".[test]"
-.venv/bin/python test_os_schedule_gen.py
-.venv/bin/python stdio_utf8/test_stdio_utf8.py
-.venv/bin/python help_formatter/test_help_formatter.py
+python test_os_schedule_gen.py
+python stdio_utf8/test_stdio_utf8.py
+python help_formatter/test_help_formatter.py
 ```
 
 Each test file runs its folder's suites and fails if a suite yields fewer tests than its floor.
+A `# reliability: ignore[RLnnn]` comment in the source is a waiver for a reliability check run
+before each release, with its reason on the same line; nothing here reads it.
 Nothing is installed or scheduled: the command-line tests write into temporary directories, and
 the cron tests run only `sh` builtins.
 
@@ -277,14 +343,14 @@ the cron tests run only `sh` builtins.
 
 | Path | What it holds |
 | --- | --- |
-| `os_schedule_gen.py` | the library's public surface, the builders and the command line's parser |
-| `src/` | the schedules, the escapes, the Task Scheduler renderer, the host facts and the command line's work |
+| `os_schedule_gen.py` | the library's public surface, the builders, and the command line's parser |
+| `src/` | the schedules, the escapes, the Task Scheduler renderer, the host facts, and the command line's work |
 | `tests/` | the suites, one per concern |
 | `test_os_schedule_gen.py` | runs every suite in `tests/`, and checks that each one was found |
 | `samples/` | a weekly and a daily run to check by hand, with their expected files |
 | `stdio_utf8/` | a small library that keeps the command line's output UTF-8 whatever the locale says |
 | `help_formatter/` | the `--help` formatter, showing each option's live default |
-| `export-record.json` | a generated record of the export that produced this tree: its source commit, its version and a content hash per file. Regenerated with each export, never edited by hand |
+| `export-record.json` | a generated record of the export that produced this tree: its source commit, its version, and a content hash per file. Regenerated with each export, never edited by hand |
 
 ## License
 

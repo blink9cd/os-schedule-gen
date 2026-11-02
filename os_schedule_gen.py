@@ -14,20 +14,20 @@ here, and the rest of it lives in ``src/sched_cli.py``, loaded only when it runs
 
 Whose defaults these are
 ------------------------
-The keyword defaults -- ``TASK_NAME``, ``SYSTEMD_UNIT_BASENAME``, ``LAUNCHD_LABEL``, the
-descriptions and a plain weekly ``--mode run`` -- are those of the weekly maintenance job
+The keyword defaults (``TASK_NAME``, ``SYSTEMD_UNIT_BASENAME``, ``LAUNCHD_LABEL``, the
+descriptions and a plain weekly ``--mode run``) are those of the weekly maintenance job
 this library was first written for, called "the sweep" below, and tests pin them byte for
 byte. Every other caller passes its own name, arguments and triggers; the command line
 always does.
 
 The one thing every generator here shares
 -----------------------------------------
-**The output describes the TARGET, never the host that generated it.** Four
+The output describes the target, never the host that generated it. Four
 independent instances of that rule live below, and each was a real defect or a real
 near-miss:
 
 * :class:`PurePosixPath` (never plain ``Path``) in the systemd and launchd
-  working-directory derivations -- plain ``Path`` is host-flavored, so generating a
+  working-directory derivations: plain ``Path`` is host-flavored, so generating a
   unit from Windows emitted backslashes and real systemd rejected the path as "not
   absolute".
 * :class:`PureWindowsPath` in the Task Scheduler working directory, the mirror image.
@@ -35,9 +35,9 @@ near-miss:
   render, which follows ``LC_TIME`` and can emit a localized token systemd cannot
   parse.
 * A per-format escape at each builder rather than one shared helper applied at
-  capture -- systemd doubles ``%``, cron backslashes it, and plistlib needs neither.
+  capture: systemd doubles ``%``, cron backslashes it, and plistlib needs neither.
 
-The day/time itself is held ONCE, as a :class:`WeeklySchedule`, and every notation is
+The day/time itself is held once, as a :class:`WeeklySchedule`, and every notation is
 derived from it; see that class for why four hand-maintained copies is the specific
 defect it exists to prevent. A daily instant is a :class:`DailySchedule` instead, which
 derives its own notations, and every builder accepts either.
@@ -107,13 +107,13 @@ from sched_escape import (  # noqa: E402
 
 TASK_NAME = r"\Maintenance\WeeklySweep"  # documented Task Scheduler key
 # The systemd unit basename and the launchd label: the keys those two schedulers look a
-# job up BY, so they are literal names only because those schedulers require one --
+# job up by, so they are literal names only because those schedulers require one,
 # each stated once here, with every filename derived from it. The launchd label is
 # deliberately neutral: `local.` rather than a real reverse-DNS org domain, which would
 # embed an organization's identifier in shipped source.
 SYSTEMD_UNIT_BASENAME = "weekly-sweep"
 LAUNCHD_LABEL = "local.weekly-sweep"
-# The wall-clock ceiling on one scheduled sweep, held ONCE and rendered into three
+# The wall-clock ceiling on one scheduled sweep, held once and rendered into three
 # notations: the Windows task's <ExecutionTimeLimit> as an ISO 8601 duration, the systemd
 # service's TimeoutStartSec= as seconds, and RUN_TIME_LIMIT_SECONDS for a caller that
 # bounds a run it starts itself.
@@ -132,10 +132,12 @@ def launchd_plist_path(home: Path, label: str = LAUNCHD_LABEL) -> Path:
     A user agent (``~/Library/LaunchAgents``) rather than a system daemon
     (``/Library/LaunchDaemons``): it needs no elevation, which is what makes the POSIX
     backends genuinely privilege-free instead of merely skipping the Windows check. The
-    cost is stated rather than hidden -- a user agent only fires while its user has a
+    cost is stated rather than hidden: a user agent only fires while its user has a
     session, and a caller installing one should say so. The filename follows *label*, so
-    a second agent gets its own plist rather than overwriting the sweep's.
+    a second agent gets its own plist rather than overwriting the sweep's. A *label*
+    outside the job-name set raises ValueError, so the file cannot land elsewhere.
     """
+    refuse_bad_name(label, what="label")
     return home / "Library" / "LaunchAgents" / f"{label}.plist"
 
 
@@ -152,19 +154,19 @@ def build_task_xml(
     execution_limit: str = f"PT{RUN_TIME_LIMIT_HOURS}H",
     logon_type: str = "S4U",
 ) -> str:
-    """Build a schema-valid, least-privilege weekly or daily Task Scheduler XML string.
+    r"""Build a schema-valid, least-privilege weekly or daily Task Scheduler XML string.
 
-    ``python`` is the executable (for the sweep an absolute python.exe -- never the
+    ``python`` is the executable (for the sweep an absolute python.exe, never the
     ``py`` Store alias); ``script``, when given, is the absolute tool path, always quoted
     in Arguments so spaces survive, and None drops it. Each of *args* is bare or quoted by
     :func:`sched_escape.windows_word`. The weekly day is enforced by <DaysOfWeek>, a daily
     schedule by <ScheduleByDay>; the time-of-day comes from StartBoundary (its date only
     sets "not before"). *working_directory* None means the script's folder, or no element
-    when there is no script. A value holding a line break, or any control
-    character but tab (which XML cannot carry), raises ValueError.
+    when there is no script. A line break or a control character but tab in any value,
+    or a *task_name* that is not a ``\Folder\Task`` path, raises ValueError.
 
-    Both come from *schedule*, so this form is DERIVED like the three POSIX ones
-    rather than the independent original it began as -- see :class:`WeeklySchedule`.
+    Both come from *schedule*, so this form is derived like the three POSIX ones
+    rather than the independent original it began as (see :class:`WeeklySchedule`).
     The keywords default to the sweep's task, which a test pins byte for byte.
     """
     for refuse in (refuse_command_breaks, refuse_task_controls):
@@ -179,7 +181,7 @@ def build_task_xml(
         )
     if working_directory is None and script is not None:
         # PureWindowsPath, not Path: each generator's output must be a function of its
-        # TARGET platform, never of the host it happens to run on. Plain `Path` is
+        # target platform, never of the host it happens to run on. Plain `Path` is
         # host-flavored, so generating this XML from Linux would emit forward slashes
         # into a Windows-only artifact. The POSIX generators take the mirror-image step.
         working_directory = str(PureWindowsPath(script).parent)
@@ -212,10 +214,10 @@ def build_systemd_units(
     working_directory: Optional[str] = None,
     time_limit_seconds: int = RUN_TIME_LIMIT_SECONDS,
 ) -> "tuple[str, str]":
-    r"""The ``.service`` then ``.timer`` text for a systemd USER timer.
+    r"""The ``.service`` then ``.timer`` text for a systemd user timer.
 
-    Two files because systemd separates WHAT runs from WHEN: the service is a
-    ``oneshot`` (it exits -- it is not a daemon), and the timer is the unit ``enable``
+    Two files because systemd separates what runs from when: the service is a
+    ``oneshot`` (it exits; it is not a daemon), and the timer is the unit ``enable``
     attaches to ``timers.target``.
 
     ``Persistent=true`` is the counterpart of the Windows task's
@@ -230,14 +232,14 @@ def build_systemd_units(
     whitespace raises ValueError (:func:`sched_escape.systemd_work_dir`); any other one
     reads back unchanged.
 
-    ``WorkingDirectory`` is derived with :class:`PurePosixPath`, NOT plain ``Path``:
+    ``WorkingDirectory`` is derived with :class:`PurePosixPath`, not plain ``Path``:
     ``Path`` is host-flavored, so generating this unit from a Windows process emitted
     ``\tmp\spaced dir`` and real systemd rejected it as "path is not absolute". Caught only
-    by a live systemd -- every faked run seam had accepted it.
+    by a live systemd: every faked run seam had accepted it.
 
     ``Environment=`` carries the register-time PATH the caller captured, because the
-    unit would otherwise inherit the user manager's bare distro path. It is OMITTED
-    entirely when that capture is empty: an ``Environment="PATH="`` would blank the
+    unit would otherwise inherit the user manager's bare distro path. It is left
+    out entirely when that capture is empty: an ``Environment="PATH="`` would blank the
     search path outright, which is strictly worse than inheriting a short one.
 
     The keywords default to the sweep's units. *script* None drops that word, and with
@@ -317,16 +319,16 @@ def build_launchd_plist(
 
     Built with :mod:`plistlib` rather than a format string. The Windows path hand-rolls
     XML only because Task Scheduler's schema is not a plist; here the stdlib owns the
-    serialization, which deletes an entire escaping-bug class -- note the custom
+    serialization, which deletes an entire escaping-bug class: note the custom
     ``&quot;`` escape map :func:`render_task_xml` needs and this does not.
 
-    ``ProgramArguments`` is a LIST, so a space in either path needs no quoting at all --
+    ``ProgramArguments`` is a list, so a space in either path needs no quoting at all:
     launchd execs the vector directly instead of handing it to a shell.
 
     ``RunAtLoad`` is false by default, so installing an agent does not start its job
     (arming a systemd timer does not run its service either). A job that decides for
     itself whether a run is due can opt in, since a load-time run is then a no-op. The
-    two log paths make a crashed run diagnosable -- launchd otherwise discards a dead
+    two log paths make a crashed run diagnosable, since launchd otherwise discards a dead
     job's output, and a job's own log is not written if it dies before opening one.
 
     ``WorkingDirectory`` uses :class:`PurePosixPath` for the same reason as
@@ -345,8 +347,9 @@ def build_launchd_plist(
     *script* None drops that word and the directory derived from it; an explicit
     *working_directory* replaces that directory. *log_paths* (stdout, stderr) replaces
     the two log paths derived from *state_dir*, and with neither given both keys are
-    left out, so launchd discards the job's output.
+    left out, so launchd discards the job's output. A bad *label* raises ValueError.
     """
+    refuse_bad_name(label, what="label")
     interval: "dict[str, int]" = {"Hour": schedule.hour, "Minute": schedule.minute}
     if isinstance(schedule, WeeklySchedule):
         interval = {"Weekday": schedule.launchd_weekday, **interval}
@@ -369,7 +372,7 @@ def build_launchd_plist(
         plist["StandardOutPath"], plist["StandardErrorPath"] = log_paths
     # The launchd half of the same problem the systemd Environment= line solves: an
     # agent is handed a minimal environment, not a login shell's. Set only when the
-    # capture is non-empty, matching build_systemd_units -- an empty override would
+    # capture is non-empty, matching build_systemd_units: an empty override would
     # blank the search path rather than fall back to the inherited one. No escaping
     # here, and that asymmetry is the point: plistlib owns the serialization, so a
     # space, a percent, or a quote in an entry survives without special-casing. It
@@ -395,13 +398,13 @@ def build_cron_line(
     would run. A value holding a line break raises ValueError. See
     :data:`BACKEND_CRON_EMIT` for why this is emitted rather than installed.
 
-    The captured PATH is an INLINE ``VAR=value cmd`` prefix, not a standalone ``PATH=``
+    The captured PATH is an inline ``VAR=value cmd`` prefix, not a standalone ``PATH=``
     crontab line, which would apply to every job below it, the operator's unrelated ones
     included: the same shared-file hazard that makes this backend emit-only.
 
-    ``%`` gets a BACKSLASH, not doubled as in the systemd unit: per crontab(5) an
+    ``%`` gets a backslash, not doubled as in the systemd unit: per crontab(5) an
     unescaped percent becomes a newline and the rest is fed to the job as stdin. Third
-    format, third escape -- hence per-builder escaping. It is checked against a model of
+    format, third escape, hence per-builder escaping. It is checked against a model of
     cron's ``%`` rule and a real ``sh``, never a live cron, because nothing here installs it.
 
     *script* None drops that word; each of *args* is bare or quoted by
@@ -414,12 +417,11 @@ def build_cron_line(
     if working_directory is not None and not working_directory.startswith("/"):
         # cd reads a leading "-" as an option, and an absolute path cannot start with one.
         raise ValueError(f"working_directory must be absolute: {working_directory!r}")
-    # The escape is HOISTED out of the f-string deliberately. A backslash inside an
-    # f-string *expression* is a SyntaxError before 3.12 -- PEP 701 relaxed it -- so the
+    # The escape is hoisted out of the f-string deliberately. A backslash inside an
+    # f-string *expression* is a SyntaxError before 3.12 (PEP 701 relaxed it), so the
     # inline form made this whole module unimportable on 3.11, as measured on Rocky 9
     # (3.11.13). No check on a 3.12+ interpreter can see this: the construct is erased by
     # the parser, so it survives both an AST scan and ast.parse(feature_version=(3, 11)).
-    # Keep it hoisted.
     prefix = f"PATH={cron_quote(path_value)} " if path_value else ""
     enter = f"cd {cron_quote(working_directory)} && " if working_directory else ""
     command = " ".join(command_words((python, script), args, cron_quote, cron_word))
@@ -464,7 +466,9 @@ def build_parser() -> "argparse.ArgumentParser":
     parser.add_argument(
         "--target", action="append", choices=cli.TARGETS, help=text["target"]
     )
-    parser.add_argument("--force", action="store_true", help=text["force"])
+    parser.add_argument(
+        "--force", action="store_true", default=None, help=text["force"]
+    )
     parser.add_argument("--description", help=text["description"])
     parser.add_argument("--working-directory", metavar="DIR", help=text["work"])
     parser.add_argument("--path-env", metavar="PATH", help=text["path"])

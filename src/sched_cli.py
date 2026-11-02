@@ -68,8 +68,8 @@ _ISO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 # Line breaks written in: the parent's formatter keeps them, as it must for the epilog.
 DESCRIPTION = (
     "Render one weekly or daily schedule into the files each platform's scheduler\n"
-    "reads -- Task Scheduler XML, a systemd .service/.timer pair, a launchd plist and a\n"
-    "crontab line -- and write them into --output-dir. It installs nothing."
+    "reads (Task Scheduler XML, a systemd .service/.timer pair, a launchd plist and a\n"
+    "crontab line) and write them into --output-dir. It installs nothing."
 )
 EPILOG = """\
 Prerequisites: none beyond an existing --output-dir. Run it, then register each file
@@ -109,6 +109,8 @@ HELP = {
     ),
     "out": "An existing directory the files are written into.",
     "target": "An artifact to write, repeatable; all four when omitted.",
+    # The parser gives --force a default of None, not False, so the formatter hides it
+    # as it hides every other unset default.
     "force": "Overwrite files that already exist.",
     "description": (
         "systemd Description= and the task's Description; 'Scheduled job <name>' "
@@ -379,7 +381,7 @@ def _write_all(files: "List[Tuple[Path, bytes]]") -> int:
 def run(args: argparse.Namespace, *, today: Callable[[], date] = date.today) -> int:
     """Render and write the files *args* asks for; return the exit code.
 
-    Validate, then render EVERY target, then check EVERY destination, and only then
+    Validate, then render every target, then check every destination, and only then
     write: a refusal or an existing file therefore leaves the output directory exactly
     as it was. *today* is the ``--start-date`` default, injectable for tests.
     """

@@ -3,7 +3,7 @@
 
 Each test runs ``main`` against a fresh temporary output directory, so nothing outside it
 is written and nothing is ever installed. The exit-code contract is the one the epilog
-states: 0 written, 1 a destination already exists (and then NOTHING is written), 2 bad
+states: 0 written, 1 a destination already exists (and then nothing is written), 2 bad
 input, with a message on stderr naming the option at fault.
 """
 
@@ -371,6 +371,22 @@ class ParserTests(unittest.TestCase):
 
     def test_help_shows_the_time_limit_default(self) -> None:
         self.assertIn("120", sa.build_parser().format_help())
+
+    def test_help_shows_no_default_a_person_could_not_type(self) -> None:
+        # The other options say what leaving them out means; a bare False or None
+        # beside --force would be the one stock note left among them.
+        text = sa.build_parser().format_help()
+        for note in ("(default: False)", "(default: None)"):
+            with self.subTest(note=note):
+                self.assertNotIn(note, text)
+
+    def test_force_is_off_when_omitted_and_on_when_given(self) -> None:
+        parser = sa.build_parser()
+        required = (
+            "--name", "n", "--time", "01:00", "--program", "/p", "--output-dir", ".",
+        )  # fmt: skip
+        self.assertFalse(parser.parse_args(required).force)
+        self.assertIs(parser.parse_args([*required, "--force"]).force, True)
 
     def test_help_states_the_time_limit_maximum(self) -> None:
         self.assertIn("525600", sa.build_parser().format_help())

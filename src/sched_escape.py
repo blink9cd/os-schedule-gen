@@ -5,8 +5,8 @@ rule set per format, because each consumer reads a different set of characters s
 systemd's unit parser, its specifier and variable expansion, cron's ``%`` and ``sh``, and the
 Windows command-line parser a Task Scheduler action's ``Arguments`` goes through.
 
-An ARGUMENT is written bare when :func:`is_bare_word` holds -- a non-empty run of letters,
-digits and ``_ . / : = + , @ -`` -- because no format here reads any of those specially, and
+An argument is written bare when :func:`is_bare_word` holds (a non-empty run of letters,
+digits and ``_ . / : = + , @ -``), because no format here reads any of those specially, and
 quoted otherwise. That is what keeps a trusted literal such as ``--mode run`` byte for byte
 as it always was, while a caller's ``a b`` or ``$x`` is quoted like any path.
 
@@ -86,18 +86,39 @@ def refuse_task_controls(
     python: str,
     script: Optional[str],
     args: "tuple[str, ...]",
+    *,
+    task_name: str,
     **more: Optional[str],
 ) -> None:
     """Raise ValueError, naming the keyword, for a Task XML value holding a control character.
 
     Named as :func:`refuse_command_breaks` names them. A tab is kept: XML holds it, and
-    it is an ordinary argument character on a Windows command line.
+    it is an ordinary argument character on a Windows command line. *task_name* is then
+    held to its path shape by :func:`refuse_bad_task_name`.
     """
-    for name, value in _named_values(python, script, args, more).items():
+    named = _named_values(python, script, args, {"task_name": task_name, **more})
+    for name, value in named.items():
         if _XML_CONTROL.search(value) is not None:
             raise ValueError(
                 f"{name} holds a control character a task cannot hold: {value!r}"
             )
+    refuse_bad_task_name(task_name)
+
+
+def refuse_bad_task_name(task_name: str) -> None:
+    r"""Raise ValueError unless *task_name* is a task path: ``\`` and job-name segments.
+
+    Each segment between backslashes is held to :data:`JOB_NAME`, so a ``..`` segment, an
+    empty one, a space or markup is refused rather than handed to Task Scheduler, which
+    reads the path as a folder tree. ``\Maintenance\WeeklySweep`` is one such path.
+    """
+    segments = task_name.split("\\")
+    head, *parts = segments
+    if head or not parts or not all(JOB_NAME.fullmatch(part) for part in parts):
+        raise ValueError(
+            "task_name must be a backslash, then backslash-separated segments of letters, "
+            f"digits, '.', '_' or '-', each starting with a letter or digit: {task_name!r}"
+        )
 
 
 def command_words(

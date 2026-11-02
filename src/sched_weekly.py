@@ -31,23 +31,23 @@ _SYSTEMD_DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
 @dataclass(frozen=True)
 class WeeklySchedule:
-    """One weekly instant, and the ONE representation every backend derives from.
+    """One weekly instant, and the one representation every backend derives from.
 
     Four schedulers spell the same instant four different ways: Task Scheduler wants an
-    English day ELEMENT and an ISO ``StartBoundary``, systemd an abbreviated day NAME,
-    launchd and cron an INTEGER -- and those integers count Sunday as 0 where ISO
+    English day element and an ISO ``StartBoundary``, systemd an abbreviated day name,
+    launchd and cron an integer, and those integers count Sunday as 0 where ISO
     weekdays count Monday as 1. Holding the instant once and deriving each notation from
     it is what stops the four from drifting apart; four hand-maintained copies is exactly
     the defect this type exists to prevent, which is why the Windows form derives from it
     too rather than remaining the independent original it started as.
     """
 
-    weekday: str  # a DAYS member -- also Task Scheduler's own English day name
+    weekday: str  # a DAYS member, and also Task Scheduler's own English day name
     hour: int
     minute: int
 
     def __post_init__(self) -> None:
-        """Refuse a field no backend renders: the XML uses *weekday* as an element NAME."""
+        """Refuse a field no backend renders: the XML uses *weekday* as an element name."""
         if self.weekday not in DAYS:
             raise ValueError(
                 f"weekday must be one of {', '.join(DAYS)}: {self.weekday!r}"
@@ -61,7 +61,7 @@ class WeeklySchedule:
 
     @property
     def _sunday_zero_day(self) -> int:
-        """Day index counting Sunday as 0 -- the convention launchd and cron SHARE.
+        """Day index counting Sunday as 0, the convention launchd and cron share.
 
         Named once because two backends use it. Deriving cron's field from launchd's
         would read as a coincidence between unrelated schedulers, while writing the
@@ -103,7 +103,7 @@ class WeeklySchedule:
     def cron_fields(self) -> str:
         """The five cron time fields: ``minute hour * * day-of-week``.
 
-        Plain integers, deliberately NOT zero-padded like :attr:`hhmm`: cron reads
+        Plain integers, deliberately not zero-padded like :attr:`hhmm`: cron reads
         these as numbers and a leading zero buys nothing.
         """
         return f"{self.minute} {self.hour} * * {self.cron_day_of_week}"

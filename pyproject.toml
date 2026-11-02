@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "os-schedule-gen"
-version = "0.1.0"
+version = "0.2.0"
 description = "A multi-OS scheduler file generator: write a schedule once and run it on Windows, Linux and macOS."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -85,80 +85,3 @@ exclude_also = [
   'pragma:\s*only-on\s+posix\b(?!${OS-})',
   'pragma:\s*only-on\s+win32\b${OS-}',
 ]
-
-# The tables below configure the gates run over this tree before it is published. They are
-# inert for anyone who only runs the tool or its tests. The same gates read the few waivers
-# in the source, comments of the form `# reliability: ignore[...]`, each stating its reason
-# on the line.
-
-[tool.pii_scan]
-# The license names its copyright holder, which is its purpose.
-exclude = ["LICENSE"]
-
-[tool.samples_presence]
-# Libraries with no CLI: nothing in them runs by hand against a sample input. The tool
-# itself ships samples/.
-exempt = ["stdio_utf8", "help_formatter"]
-
-[tool.stdio_policy]
-# The whole tree, the vendored libraries included: a library is exactly where a stray
-# print() does not belong.
-paths = ["."]
-
-[tool.dep_audit]
-# Pinning checks only in the inner loop; the network audit is run on demand.
-offline = "skip"
-
-# prose: ignore[cli_doc_consistency] the table this gate reads, named for it
-[tool.cli_doc_consistency]
-# README.md is the user guide and holds the option table; --help is the option reference,
-# and no companion doc beside os_schedule_gen.py ships.
-exclude = ["os_schedule_gen.py"]
-
-[tool.context_budget]
-# Budgets the instruction files a coding assistant loads at the start of a session. This
-# repository carries none, so the table declares no subjects: the check then has a
-# declaration to read, and measures nothing.
-
-[tool.prose_terms]
-# Words this repository's prose must not use, so they cannot creep back in. They name a
-# standards file, a notes folder and tools from the larger repository this was developed
-# in, none of which ship here, so a sentence that leans on one explains nothing to its
-# reader: state the rule itself, with a reason anyone can check. Each entry waives itself:
-# the declaration is not prose.
-terms = [
-  # prose: ignore[technical_notes] the declaration itself
-  "technical_notes",
-  # prose: ignore[monorepo] the declaration itself
-  "monorepo",
-  # prose: ignore[gate_tree] the declaration itself
-  "gate_tree",
-  # prose: ignore[gate_tree_sweep] the declaration itself
-  "gate_tree_sweep",
-  # prose: ignore[launchd_probe] the declaration itself
-  "launchd_probe",
-  # prose: ignore[py_version_floor] the declaration itself
-  "py_version_floor",
-  # prose: ignore[tool_subdirs] the declaration itself
-  "tool_subdirs",
-  # prose: ignore[python_gate] the declaration itself
-  "python_gate",
-  # prose: ignore[fuzz_gate] the declaration itself
-  "fuzz_gate",
-  # prose: ignore[check_all] the declaration itself
-  "check_all",
-  # prose: ignore[cli_doc_consistency] the declaration itself
-  "cli_doc_consistency",
-  # prose: ignore[install_prereqs] the declaration itself
-  "install_prereqs",
-]
-exclude = ["LICENSE"]
-
-[tool.prose_terms.patterns]
-# Shapes no single word can express, each a pointer that resolves for no reader of this
-# repository: a standards file by its file name (a bare word would also ban the plural
-# "agents", which a tool writing launchd agents needs), a numbered rule section of it, and a
-# path into a notes folder.
-agents-file = '(?<![0-9A-Za-z_])AGENTS\.md'  # prose: ignore[agents-file] the declaration itself
-section-ref = '(?<![0-9A-Za-z_])section\s+[0-9]+(?![0-9A-Za-z_])'  # prose: ignore[section-ref] the declaration itself
-docs-path = '(?<![0-9A-Za-z_./])docs/'  # prose: ignore[docs-path] the declaration itself

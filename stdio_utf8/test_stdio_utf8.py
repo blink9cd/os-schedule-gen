@@ -6,13 +6,13 @@ grouped suites in the sibling ``tests/`` directory, which is the only way they r
 runner that launches each folder's top-level ``test_*.py`` reaches ``tests/`` through
 the ``load_tests`` hook below, and through nothing else.
 
-- ``tests/test_streams.py`` -- forcing a tool's own streams to UTF-8: stdout strict,
-  stderr escaping, and the constants that decode a child's capture.
-- ``tests/test_escaping.py`` -- the escaping boundary for a message quoting argv or a
-  file name: ``printable``, ``print_escaped`` and ``EscapingArgumentParser``.
-- ``tests/test_spell_unsafe.py`` -- ``spell_unsafe``, which spells a character a
+- ``tests/test_streams.py``: forcing a tool's own streams to UTF-8 (stdout strict,
+  stderr escaping), and the constants that decode a child's capture.
+- ``tests/test_escaping.py``: the escaping boundary for a message quoting argv or a
+  file name, through ``printable``, ``print_escaped`` and ``EscapingArgumentParser``.
+- ``tests/test_spell_unsafe.py``: ``spell_unsafe``, which spells a character a
   terminal would act on as a visible escape.
-- ``tests/test_bootstrap.py`` -- this project's own ``sys.path`` bootstrap, which puts
+- ``tests/test_bootstrap.py``: this project's own ``sys.path`` bootstrap, which puts
   this library on the path from one fixed place, the folder at the project root, and
   never searches the ancestors.
 
@@ -30,12 +30,12 @@ _HERE = Path(__file__).resolve().parent
 _SUITE_DIR = _HERE / "tests"
 sys.path.insert(0, str(_HERE))
 
-# What each grouped file must yield, floored SEPARATELY rather than as one combined total.
-# An empty or half-failed discovery is otherwise a PASSING run: "no tests ran" and "every
-# test passed" are the same exit code. One combined floor decays by growth -- once the
+# What each grouped file must yield, floored separately rather than as one combined total.
+# An empty or half-failed discovery is otherwise a passing run: "no tests ran" and "every
+# test passed" are the same exit code. One combined floor decays by growth. Once the
 # suite exceeds it by more than the smallest file holds, that file can be lost whole while
 # the total still clears it. A per-file floor closes that, and the key-set comparison
-# below means a file added later arrives unfloored LOUDLY.
+# below means a file added later fails as unfloored.
 #
 # Restated, not derived: a floor computed from discovery would compare discovery against
 # itself and pass for an empty suite, which is the defect this guard exists to catch.
@@ -46,7 +46,7 @@ _MIN_TESTS_BY_FILE: dict[str, int] = {
     "test_streams.py": 15,
 }
 
-# This module's OWN tests: the guards below. Counted apart from the grouped floors, and
+# This module's own tests: the guards below. Counted apart from the grouped floors, and
 # exactly: a combined number would carry the grouped suites' growth as slack a deleted
 # guard could hide in, and so would a floor.
 _OWN_GUARD_TESTS = 2
@@ -67,7 +67,7 @@ def _tests_by_module(suite: unittest.TestSuite) -> dict[str, int]:
 
     ``discover`` returns a suite of suites, so this recurses rather than assuming a fixed
     depth. Each leaf's ``__module__`` becomes a ``<name>.py`` key, matching
-    ``_MIN_TESTS_BY_FILE`` -- and, for this module's own tests, ``__name__``.
+    ``_MIN_TESTS_BY_FILE`` and, for this module's own tests, ``__name__``.
     """
     counts: dict[str, int] = {}
     for item in suite:
@@ -81,10 +81,10 @@ def _tests_by_module(suite: unittest.TestSuite) -> dict[str, int]:
 
 
 class GroupedSuiteDiscoveryTest(unittest.TestCase):
-    """Fail loudly when a grouped suite is lost -- or when a guard in here is."""
+    """Fail loudly when a grouped suite is lost, or when a guard in here is."""
 
     def test_module_load_includes_the_grouped_suites(self) -> None:
-        """Guards the ``load_tests`` WIRING, which a discovery-based check cannot see.
+        """Guards the ``load_tests`` wiring, which a discovery-based check cannot see.
 
         Deleting or renaming ``load_tests`` stops every grouped suite running, while a
         guard calling ``_grouped_suite()`` directly would re-derive the same count off disk
@@ -108,11 +108,11 @@ class GroupedSuiteDiscoveryTest(unittest.TestCase):
             grouped_found,
             grouped_floor,
             f"loading this module yielded {grouped_found} grouped tests, expected at "
-            f"least {grouped_floor} -- load_tests may have been removed or renamed",
+            f"least {grouped_floor}: load_tests may have been removed or renamed",
         )
 
     def test_grouped_suite_meets_its_own_per_file_floor(self) -> None:
-        """Fail when ONE grouped file has lost tests, or a file arrives unfloored."""
+        """Fail when one grouped file has lost tests, or a file arrives unfloored."""
         found_by_file = _tests_by_module(_grouped_suite())
         self.assertEqual(
             found_by_file.keys(),

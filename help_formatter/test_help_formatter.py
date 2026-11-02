@@ -4,20 +4,20 @@
 Why these tests do not assert on ``format_help()`` for the required-option case
 -----------------------------------------------------------------------------
 The shim exists for CPython < 3.13, which stamps a misleading ``(default: None)`` onto
-*required* options. That bug is FIXED upstream, so on an interpreter newer than the fix
-(3.13 or later) the stock ``ArgumentDefaultsHelpFormatter`` already behaves exactly like
-the shim. Measured: for a
-required action with either ``default=None`` or ``default=7``, the stock hook returns
-``action.help`` unchanged, identical to the shim's output.
+*required* options. That bug is fixed upstream, so on any interpreter newer than the fix
+the stock ``ArgumentDefaultsHelpFormatter`` already behaves exactly like the shim.
+Measured: for a required action with either ``default=None`` or ``default=7``, the stock
+hook returns ``action.help`` unchanged, identical to the shim's output.
 
-A rendering test of the required case is therefore **vacuous on this interpreter** -- it
+A rendering test of the required case is therefore vacuous on such an interpreter: it
 passes with the override deleted. (It was written that way first and confirmed to pass
 against a no-op stub, which is why it is not written that way now.)
 
 So the required-option contract is pinned against :class:`_LegacyDefaultsBase`, a
 stand-in that appends the default note *unconditionally*, the way old argparse did. That
-tests the shim's OWN logic rather than CPython's, and it stays meaningful on every
-interpreter -- including the 3.12 floor the shim is actually for.
+tests the shim's own logic rather than CPython's, and it stays meaningful on every
+interpreter, including the interpreters below 3.13 the shim is actually for, which the
+test run may never use.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ _DEFAULT_NOTE = " (default: %(default)s)"
 
 
 class _LegacyDefaultsBase(argparse.ArgumentDefaultsHelpFormatter):
-    """Stands in for argparse < 3.13: appends the default note to EVERY action.
+    """Stands in for argparse < 3.13: appends the default note to every action.
 
     Only the required-option branch differs between old and new argparse, so
     reproducing the old unconditional append is enough to make the shim's override
@@ -69,7 +69,7 @@ class LegacyInterceptTests(unittest.TestCase):
         self.assertEqual(rendered, "Help text.")
 
     def test_required_action_with_a_real_default_also_loses_it(self) -> None:
-        # A required option CAN carry a default (it is unreachable, but argparse
+        # A required option can carry a default (it is unreachable, but argparse
         # allows it); the note is misleading there for the same reason.
         rendered = self.formatter._get_help_string(_action(required=True, default=7))
         self.assertEqual(rendered, "Help text.")
@@ -87,8 +87,8 @@ class LegacyInterceptTests(unittest.TestCase):
 class RenderedOutputTests(unittest.TestCase):
     """Real ``format_help()`` behavior, on whatever interpreter is running.
 
-    These document the observable end result. They are deliberately NOT the pin for
-    the required case -- see the module docstring.
+    These document the observable end result. They are deliberately not the pin for
+    the required case; see the module docstring.
     """
 
     def test_optional_shows_its_live_default(self) -> None:
@@ -96,7 +96,7 @@ class RenderedOutputTests(unittest.TestCase):
             prog="demo", formatter_class=help_formatter.ReqAwareDefaultsFormatter
         )
         parser.add_argument("--depth", default=99, help="How deep to walk.")
-        # Derived from default=, never hardcoded into help= -- changing one moves --help.
+        # Derived from default=, never hardcoded into help=, so changing one moves --help.
         self.assertIn("default: 99", parser.format_help())
 
     def test_required_option_never_shows_a_default(self) -> None:
@@ -170,8 +170,73 @@ class RawNoneHidingRenderedTests(unittest.TestCase):
         self.assertIn("first line\n  second line", rendered)
 
 
+class _UnsetShimOverLegacy(help_formatter.UnsetHidingFormatter, _LegacyDefaultsBase):
+    """The unset-hiding shim over the legacy base, so its required case is observable."""
+
+
+class UnsetHidingLegacyTests(unittest.TestCase):
+    """The unset-hiding formatter's own logic, pinned against the legacy stand-in."""
+
+    def setUp(self) -> None:
+        self.formatter = _UnsetShimOverLegacy(prog="demo")
+
+    def test_a_none_default_is_never_shown(self) -> None:
+        rendered = self.formatter._get_help_string(_action(required=False))
+        self.assertEqual(rendered, "Help text.")
+
+    def test_an_empty_list_default_is_never_shown(self) -> None:
+        # An append/extend option's [] means "none given", which no one can type either.
+        rendered = self.formatter._get_help_string(_action(required=False, default=[]))
+        self.assertEqual(rendered, "Help text.")
+
+    def test_an_empty_tuple_default_is_never_shown(self) -> None:
+        rendered = self.formatter._get_help_string(_action(required=False, default=()))
+        self.assertEqual(rendered, "Help text.")
+
+    def test_a_non_empty_list_default_keeps_the_note(self) -> None:
+        rendered = self.formatter._get_help_string(
+            _action(required=False, default=["a"])
+        )
+        self.assertEqual(rendered, "Help text." + _DEFAULT_NOTE)
+
+    def test_an_empty_string_default_keeps_the_note(self) -> None:
+        # "" is a value a person can type (--flag ''), unlike None or an empty list.
+        rendered = self.formatter._get_help_string(_action(required=False, default=""))
+        self.assertEqual(rendered, "Help text." + _DEFAULT_NOTE)
+
+    def test_a_required_option_with_a_real_default_loses_the_note(self) -> None:
+        rendered = self.formatter._get_help_string(_action(required=True, default=7))
+        self.assertEqual(rendered, "Help text.")
+
+
+class UnsetHidingRenderedTests(unittest.TestCase):
+    """``format_help()`` under the unset-hiding formatter, on the running interpreter."""
+
+    def _parser(self, epilog: str | None = None) -> argparse.ArgumentParser:
+        return argparse.ArgumentParser(
+            prog="demo",
+            epilog=epilog,
+            formatter_class=help_formatter.UnsetHidingFormatter,
+        )
+
+    def test_unset_defaults_are_not_shown_and_a_real_one_is(self) -> None:
+        parser = self._parser()
+        parser.add_argument("--model", help="Leave out to use the first found.")
+        parser.add_argument("--skip", action="append", default=[], help="Skip one.")
+        parser.add_argument("--depth", default=99, help="How deep to walk.")
+        rendered = parser.format_help()
+        self.assertNotIn("default: None", rendered)
+        self.assertNotIn("default: []", rendered)
+        self.assertIn("(default: 99)", rendered)
+
+    def test_the_epilog_is_rewrapped_not_kept_raw(self) -> None:
+        # The non-raw counterpart of RawNoneHidingFormatter: a prose epilog is filled.
+        parser = self._parser(epilog="one\ntwo")
+        self.assertIn("one two", parser.format_help())
+
+
 class ExportTests(unittest.TestCase):
-    """The public name is what every CLI binds to, so pin its shape."""
+    """The public name is what every importer binds to, so pin its shape."""
 
     def test_is_an_argparse_defaults_formatter(self) -> None:
         self.assertTrue(
@@ -185,6 +250,11 @@ class ExportTests(unittest.TestCase):
         cls = help_formatter.RawNoneHidingFormatter
         self.assertTrue(issubclass(cls, help_formatter.ReqAwareDefaultsFormatter))
         self.assertTrue(issubclass(cls, argparse.RawDescriptionHelpFormatter))
+
+    def test_the_unset_hiding_formatter_is_not_raw(self) -> None:
+        cls = help_formatter.UnsetHidingFormatter
+        self.assertTrue(issubclass(cls, help_formatter.ReqAwareDefaultsFormatter))
+        self.assertFalse(issubclass(cls, argparse.RawDescriptionHelpFormatter))
 
 
 if __name__ == "__main__":

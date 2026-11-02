@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 r"""Caller-supplied arguments: each must reach its program as exactly the word given.
 
-An argument is rendered BARE only when it is a non-empty run of letters, digits and
+An argument is rendered bare only when it is a non-empty run of letters, digits and
 ``_ . / : = + , @ -``: no whitespace, no quote, no backslash, no ``%`` or ``$``, no glob,
 tilde or shell metacharacter, so neither systemd, ``sh``, cron nor the Windows command-line
 parser reads any character of it specially. That rule is what keeps the sweep's literal
@@ -11,7 +11,7 @@ paths: systemd's rules by a model, cron's ``%`` by a model and then a real ``sh`
 Windows command line by a model of ``CommandLineToArgvW`` that is itself checked against
 the standard library's own encoder for that convention (``subprocess.list2cmdline``).
 
-The script word in the Task XML is quoted ALWAYS, as the sweep's task always quoted it, and
+The script word in the Task XML is always quoted, as the sweep's task always quoted it, and
 escaped too: unescaped, a ``"`` or a trailing ``\`` in it would end the quote early.
 """
 

@@ -96,6 +96,34 @@ class TaskXmlKeywordTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     sa.build_task_xml(_WEEKLY, python, script, _START, args=args)
 
+    def test_a_task_name_outside_the_safe_shape_is_refused(self) -> None:
+        # A leading backslash, then backslash-separated segments each in the job-name
+        # set: a ".." segment, markup or an empty segment is not a task path.
+        for name in (
+            "",
+            "\\",
+            "nightly",
+            r"\a\..\b",
+            r"\a\\b",
+            "\\a\\",
+            "<Evil/>",
+            r"\<Evil/>",
+            r"\a b",
+            r"\-x",
+            r"\.x",
+            r"\a/b",
+        ):
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError):
+                    sa.build_task_xml(_WEEKLY, _PROGRAM, None, _START, task_name=name)
+
+    def test_a_task_name_in_the_safe_shape_is_kept(self) -> None:
+        for name in (sa.TASK_NAME, r"\Reports\NightlyReport", r"\nightly-report"):
+            with self.subTest(name=name):
+                xml = sa.build_task_xml(_WEEKLY, _PROGRAM, None, _START, task_name=name)
+                uri = ET.fromstring(xml).findtext(f"{_NS}RegistrationInfo/{_NS}URI")
+                self.assertEqual(uri, name)
+
 
 class SystemdKeywordTests(unittest.TestCase):
     """``build_systemd_units``' keywords reach the units they name."""
@@ -207,6 +235,29 @@ class LaunchdKeywordTests(unittest.TestCase):
         )
         self.assertEqual(
             plist["StandardOutPath"], "/var/tmp/state/logs/launchd.out.log"
+        )
+
+    def test_a_launchd_label_outside_the_safe_set_is_refused(self) -> None:
+        # The label names the plist file, so a separator in it would place the file
+        # outside LaunchAgents: the same set a unit name is held to.
+        for label in ("", "a b", "a/b", "../../etc/x", "a\nb", "-x", ".x", ".", ".."):
+            with self.subTest(label=label):
+                with self.assertRaises(ValueError):
+                    sa.build_launchd_plist(
+                        _WEEKLY, _PROGRAM, None, None, "", label=label
+                    )
+
+    def test_a_plist_path_for_a_label_outside_the_safe_set_is_refused(self) -> None:
+        for label in ("", "a/b", "../../etc/x", "-x", ".x", ".", ".."):
+            with self.subTest(label=label):
+                with self.assertRaises(ValueError):
+                    sa.launchd_plist_path(Path("/opt/example/user"), label)
+
+    def test_a_plist_path_for_a_safe_label_stays_in_launch_agents(self) -> None:
+        path = sa.launchd_plist_path(Path("/opt/example/user"), "local.nightly-report")
+        self.assertEqual(
+            path,
+            Path("/opt/example/user/Library/LaunchAgents/local.nightly-report.plist"),
         )
 
 

@@ -1,10 +1,10 @@
-"""Grouped suite: ``spell_unsafe`` -- a name a terminal would act on, made visible.
+"""Grouped suite: ``spell_unsafe``, a name a terminal would act on, made visible.
 
 A name or message the tool did not write can hold an escape sequence (a clipboard write,
 a hyperlink, a cursor move) that drives the terminal it is printed to, or a direction
 override that makes it read as another name. ``spell_unsafe`` prints each such character
 as a visible escape and leaves every other character as it is. Unlike ``printable``, it
-is about what a terminal DOES with a character, not whether UTF-8 can encode it.
+is about what a terminal *does* with a character, not whether UTF-8 can encode it.
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import stdio_utf8  # noqa: E402 - import follows the sys.path bootstrap above
 
-# The determinism convention, held in a profile so another profile can replace it (see
-# test_escaping.py).
+# A deterministic Hypothesis run, held in the profile so an exploring campaign runner
+# can apply its own settings (see test_escaping.py).
 settings.register_profile(
     "deterministic",
     derandomize=True,
