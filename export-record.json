@@ -3,14 +3,15 @@
     ".gitattributes": "sha256:d8cfbe8759187c02005872d3eb4c400036f937bfce019c60ea50f2d0c9796224",
     ".gitignore": "sha256:126bfb8c02558e508a0db341e363d800cbae5f7ed522d0f0e6cc51df3bd7ec9f",
     ".markdownlint-cli2.jsonc": "sha256:a9a0977337a8d99871fad01179e9b6c6e01642636b1ea0efc0c249cb46acb7a7",
-    "CHANGELOG.md": "sha256:de00122258ad44e22cf5a999982fff804cb75d06e5c1b02dd352ce7fbd881b33",
-    "LICENSE": "sha256:480bc086cc31abd0ec8598db97abf2a5490bf30613bc209342a4e2c71a0f8b87",
+    "CHANGELOG.md": "sha256:b3870ace53ebd96c99992ab2f2af186428236f39c9087b33360c274f72eb8196",
+    "LICENSE": "sha256:57c8ff33c9c0cfc3ef00e650a1cc910d7ee479a8bc509f6c9209a7c2a11399d6",
+    "NOTICE": "sha256:327ceae4f0e5a0b8baa3c5cef657cc5bf1ed0d00964e056974dd774243224489",
     "README.md": "sha256:e234b7b3f7eb20bec56fc9374a14169cd5355da028ad04984f5a9ade74b2b75e",
     "help_formatter/help_formatter.md": "sha256:30d9c22923dfd553945285d290445a57f91eab18b2c86b79e75fc596ceb5cdcb",
     "help_formatter/help_formatter.py": "sha256:c551f56c277a9eb0ec9a4707273c311ccc1d9e5a6be69ca04c4f1b251e8295ac",
     "help_formatter/test_help_formatter.py": "sha256:db65b59a92d5e7c90d744bbb0244cd56713043f3d5bccf8c277df2613bb19051",
     "os_schedule_gen.py": "sha256:2b8217591b459d1f002b852b00f99acbf13d8aba24894f3ccba8e4b7bc93cbad",
-    "pyproject.toml": "sha256:d99324de5967947bd66192ca9a91cd57ffc46526c6e12e7574bded73f6b1fdbc",
+    "pyproject.toml": "sha256:85fcfbd08fae64f9b3d5456bd5b9f240aedb9a579ff641b50eccf0e6aa6c502c",
     "samples/README.md": "sha256:a052e2945db01dfe1d5728e176e1fa1598b97b6f2ba030abcb31fe1d22c05b2e",
     "samples/daily/nightly-report.crontab": "sha256:fc933e097b57b802e83b8ed9955e536abfd436e70c0ecd6252bf8827d180c26a",
     "samples/daily/nightly-report.plist": "sha256:462cd4f003d49035bea8a4117ff0adc242d64a3429690eb28de9962d32cb13f3",
@@ -49,6 +50,6 @@
   },
   "name": "os-schedule-gen",
   "schema": 1,
-  "source_commit": "e6d38c2f1dcbe59c7afeda50f0b3b955d0e52496",
-  "version": "0.2.0"
+  "source_commit": "9afc032130366c58dfaa87269ce45983b633921e",
+  "version": "0.2.1"
 }
